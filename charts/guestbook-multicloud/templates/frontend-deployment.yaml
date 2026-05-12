@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: guestbook
+    tier: frontend
+    {{- include "guestbook-multicloud.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels:
+      app: guestbook
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: guestbook
+        tier: frontend
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: php-redis
+          image: {{ .Values.frontend.image | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: GET_HOSTS_FROM
+              value: "dns"
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

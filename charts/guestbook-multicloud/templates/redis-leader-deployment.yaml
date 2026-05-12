@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-leader
+  labels:
+    app: redis
+    role: leader
+    tier: backend
+    {{- include "guestbook-multicloud.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.redisLeader.replicas }}
+  selector:
+    matchLabels:
+      app: redis
+      role: leader
+      tier: backend
+  template:
+    metadata:
+      labels:
+        app: redis
+        role: leader
+        tier: backend
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: leader
+          image: {{ .Values.redisLeader.image | quote }}
+          imagePullPolicy: IfNotPresent
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.redisLeader.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

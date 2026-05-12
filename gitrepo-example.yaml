@@ -1,0 +1,19 @@
+apiVersion: fleet.cattle.io/v1alpha1
+kind: GitRepo
+metadata:
+  name: guestbook-multicloud
+  namespace: fleet-default
+spec:
+  branch: main # in production, you should use a specific release branch or tag
+  correctDrift: {} 
+  paths:
+    - charts/guestbook-multicloud #path to the chart relative to the root of the repository
+    # fleet.yaml is the configuration file for the fleet bundle in the root of the repository
+  pollingInterval: 1m0s
+  repo: https://github.com/jmarhee/fleet-ingress-multicloud-example.git
+  targets:
+    - clusterGroup: traefik-clusters # clusters labeled with ingress.controller: traefik
+    - clusterGroup: nginx-clusters # clusters labeled with ingress.controller: nginx
+# clusterGroup is a label selector that matches the clusters in the cluster group.
+# for example, using a secondary label like platform: eks will match all clusters labeled with platform: eks
+# More on clusterGroups: https://fleet.rancher.io/how-tos-for-operators/cluster-group

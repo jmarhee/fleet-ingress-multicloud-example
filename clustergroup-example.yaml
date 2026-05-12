@@ -1,0 +1,16 @@
+apiVersion: fleet.cattle.io/v1alpha1
+kind: ClusterGroup
+metadata:
+  name: nginx-clusters
+  namespace: fleet-default
+spec:
+  selector:
+    matchLabels:
+      ingress.controller: nginx
+      #  key: string, for example, platform: kvm will match all clusters labeled with platform: kvm
+      # this will, then, for example, match all clusters labeled with ingress.controller: nginx and platform: kvm
+    # matchExpressions:
+    #   - key: platform
+    #     operator: In
+    #     values:
+    #       - kvm

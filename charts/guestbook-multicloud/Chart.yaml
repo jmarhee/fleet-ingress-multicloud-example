@@ -1,0 +1,15 @@
+apiVersion: v2
+name: guestbook-multicloud
+description: >
+  Helm chart for the Kubernetes guestbook tutorial (PHP frontend + Redis).
+  Ingress class and annotations are configurable for multi-cloud Fleet bundles.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - guestbook
+  - redis
+  - multicloud
+  - ingress
+maintainers:
+  - name: platform-team

@@ -1,0 +1,158 @@
+# fleet.yaml — Rancher Fleet bundle configuration
+#
+# This bundle deploys the guestbook-multicloud Helm chart and uses
+# targetCustomizations to inject the correct ingress class and annotations
+# for each cloud platform.
+#
+# Example Fleet cluster registration labels:
+#   AWS EKS cluster       : provider=eks
+#   Azure (approuting)    : provider=aks, ingress.controller=approuting
+#   Azure (AGIC)          : provider=aks, ingress.controller=agic
+#   KVM / ingress-nginx   : provider=kvm, ingress.controller=nginx
+#   KVM / Traefik         : provider=kvm, ingress.controller=traefik
+
+defaultNamespace: default
+
+helm:
+  # Path to the chart, relative to this fleet.yaml
+  chart: ./charts/guestbook-multicloud
+  releaseName: guestbook-multicloud
+  # Global baseline values — overridden per target below
+  values:
+    ingress:
+      className: "nginx"
+      annotations: {}
+
+# ── Target Customizations ────────────────────────────────────────────────────
+# Each entry selects clusters by label and merges additional Helm values on
+# top of the baseline values above. Values are deep-merged, so you only need
+# to specify what changes.
+targetCustomizations:
+  # ── AWS EKS — AWS Load Balancer Controller (ALB) ──────────────────────────
+  # Requires the AWS Load Balancer Controller to be installed in the cluster.
+  # The ALB controller uses spec.ingressClassName: alb plus the scheme
+  # annotation to determine whether to provision an internet-facing or
+  # internal Application Load Balancer.
+  - name: eks-alb
+    clusterSelector:
+      matchLabels:
+        provider: eks
+    helm:
+      values:
+        ingress:
+          className: "alb"
+          annotations:
+            # Required: tells ALB controller to create an internet-facing ALB.
+            # Change to "internal" for private/internal load balancers.
+            alb.ingress.kubernetes.io/scheme: internet-facing
+            # Recommended: route traffic directly to pod IPs (avoids NodePort hop).
+            alb.ingress.kubernetes.io/target-type: ip
+            # Optional extras — uncomment and adjust as needed:
+            # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:REGION:ACCOUNT:certificate/ID
+            # alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+            # alb.ingress.kubernetes.io/ssl-redirect: "443"
+
+  # ── Azure AKS — Web Application Routing add-on ────────────────────────────
+  # GA since AKS 1.28. Managed NGINX-based controller; uses the modern
+  # IngressClass API (spec.ingressClassName). Enable the addon with:
+  #   az aks enable-addons --addons web_application_routing ...
+  - name: aks-web-app-routing
+    clusterSelector:
+      matchLabels:
+        provider: aks
+        ingress.controller: approuting
+    helm:
+      values:
+        ingress:
+          className: "webapprouting.kubernetes.azure.com"
+          annotations:
+            # Optional: reference an Azure DNS zone for automatic DNS record creation.
+            # kubernetes.azure.com/tls-cert-keyvault-uri: https://VAULT.vault.azure.net/certificates/CERT
+            # Optional nginx-style annotations also work with this controller:
+            # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+            # nginx.ingress.kubernetes.io/rewrite-target: /
+
+  # ── Azure AKS — Application Gateway Ingress Controller (AGIC) ─────────────
+  # AGIC is a legacy controller that predates the IngressClass API and does
+  # NOT use spec.ingressClassName. Instead it selects Ingress resources via
+  # the kubernetes.io/ingress.class annotation. className must be "" (empty)
+  # so the chart omits spec.ingressClassName from the manifest.
+  - name: aks-agic
+    clusterSelector:
+      matchLabels:
+        provider: aks
+        ingress.controller: agic
+    helm:
+      values:
+        ingress:
+          # Must be empty — AGIC ignores spec.ingressClassName.
+          className: ""
+          annotations:
+            # Required for AGIC to claim this Ingress resource.
+            kubernetes.io/ingress.class: azure/application-gateway
+            # Optional AGIC-specific annotations — uncomment as needed:
+            # appgw.ingress.kubernetes.io/ssl-redirect: "true"
+            # appgw.ingress.kubernetes.io/use-private-ip: "false"
+            # appgw.ingress.kubernetes.io/request-timeout: "30"
+            # appgw.ingress.kubernetes.io/cookie-based-affinity: "true"
+
+  # NOTE: ingress-nginx is supported in RKE2, but is deprecated and will be removed in a future release, replaced
+  # by Traefik by default, as is the case with K3s. The Kubernetes Gateway API is the recommended replacement for Ingressing
+  # altogether.
+  #
+  # ── KVM / ingress-nginx — community NGINX Ingress Controller ──────────────
+  # The most widely deployed ingress controller. Uses spec.ingressClassName:
+  # nginx and the nginx.ingress.kubernetes.io/ annotation prefix.
+  # Installed via the ingress-nginx Helm chart:
+  #   helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx
+  #
+  # Note: this customization is also the effective fallback for any cluster
+  # that carries provider=kvm but no ingress.controller label, since the
+  # baseline already sets className: "nginx". Being explicit here makes the
+  # annotation pattern clear and keeps all platforms uniform.
+  - name: kvm-ingress-nginx
+    clusterSelector:
+      matchLabels:
+        provider: kvm
+        ingress.controller: nginx
+    helm:
+      values:
+        ingress:
+          className: "nginx"
+          annotations:
+            # Optional — uncomment to force HTTP→HTTPS redirect:
+            # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+            # Optional — rewrite the request path before forwarding to the backend:
+            # nginx.ingress.kubernetes.io/rewrite-target: /
+            # Optional — enable CORS:
+            # nginx.ingress.kubernetes.io/enable-cors: "true"
+            # Optional — custom proxy timeouts (seconds):
+            # nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+            # nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+
+  # ── KVM / Traefik — Traefik Proxy Ingress Controller ──────────────────────
+  # Traefik is the default ingress controller in k3s and RKE2 distributions.
+  # It uses spec.ingressClassName: traefik and routes via EntryPoints.
+  # No annotations are strictly required for basic HTTP routing — the
+  # IngressClass name alone is sufficient.
+  #
+  # Traefik-specific behaviour can be configured with annotations or,
+  # preferably, via IngressRoute CRDs for more advanced use cases.
+  - name: kvm-traefik
+    clusterSelector:
+      matchLabels:
+        provider: kvm
+        ingress.controller: traefik
+    helm:
+      values:
+        ingress:
+          className: "traefik"
+          annotations:
+            # Optional — explicitly target the web (HTTP) or websecure (HTTPS) entrypoint:
+            # traefik.ingress.kubernetes.io/router.entrypoints: web
+            # Optional — attach a Traefik Middleware (must exist as a CRD in the same namespace):
+            # traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+            # Optional — set a custom priority when multiple routers could match:
+            # traefik.ingress.kubernetes.io/router.priority: "10"
+            # Optional — require TLS on the router:
+            # traefik.ingress.kubernetes.io/router.tls: "true"

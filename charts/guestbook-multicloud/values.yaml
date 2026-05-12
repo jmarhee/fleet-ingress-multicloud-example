@@ -1,0 +1,50 @@
+# Default values for guestbook-multicloud.
+# Per-cloud ingress overrides are applied via Rancher Fleet targetCustomizations
+# in fleet.yaml (same pattern as the previous nginx sample chart).
+
+redisLeader:
+  replicas: 1
+  image: registry.k8s.io/redis@sha256:cb111d1bd870a6a471385a4a69ad17469d326e9dd91e0e455350cacf36e1b3ee
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+
+redisFollower:
+  replicas: 2
+  image: us-docker.pkg.dev/google-samples/containers/gke/gb-redis-follower:v2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+
+frontend:
+  replicas: 3
+  image: us-docker.pkg.dev/google-samples/containers/gke/gb-frontend:v5
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+
+podAnnotations: {}
+podSecurityContext: {}
+securityContext: {}
+
+service:
+  port: 80
+  targetPort: 80
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations: {}
+  hosts:
+    - host: guestbook.example.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
