@@ -12,8 +12,11 @@ spec:
   pollingInterval: 1m0s
   repo: https://github.com/jmarhee/fleet-ingress-multicloud-example.git
   targets:
-    - clusterGroup: traefik-clusters # clusters labeled with ingress.controller: traefik
+  # For migrating of an app, rather than deploying to all groups, you can specify a specific group, and switch between them:
+  #  - clusterGroup: traefik-clusters # clusters labeled with ingress.controller: traefik
     - clusterGroup: nginx-clusters # clusters labeled with ingress.controller: nginx
+  # You can mix clusterGroup and clusterName, and other selectors.
+
 # clusterGroup is a label selector that matches the clusters in the cluster group.
 # for example, using a secondary label like platform: eks will match all clusters labeled with platform: eks
 # More on clusterGroups: https://fleet.rancher.io/how-tos-for-operators/cluster-group
